@@ -33,6 +33,11 @@ export function addDefaults(config: MedplumServerConfig): ServerConfig {
   config.maxBatchSize ||= '50mb';
   config.awsRegion ||= DEFAULT_AWS_REGION;
   config.botLambdaLayerName ||= 'medplum-bot-layer';
+  const botLambdaSubnetIdsConfigured = (config.botLambdaSubnetIds?.length ?? 0) > 0;
+  const botLambdaSecurityGroupIdsConfigured = (config.botLambdaSecurityGroupIds?.length ?? 0) > 0;
+  if (botLambdaSubnetIdsConfigured !== botLambdaSecurityGroupIdsConfigured) {
+    throw new Error('botLambdaSubnetIds and botLambdaSecurityGroupIds must be configured together');
+  }
   config.bcryptHashSalt ||= 10;
   config.bullmq = { concurrency: 20, removeOnComplete: { count: 1 }, removeOnFail: { count: 1 }, ...config.bullmq };
   config.shutdownTimeoutMilliseconds ??= 30_000;
@@ -265,7 +270,13 @@ export function isObjectConfig(key: string): boolean {
   return objectKeys.has(key);
 }
 
-const arrayKeys = new Set(['blockedEmailDomains', 'disableChainedSearch', 'loginRateLimitExemptIps']);
+const arrayKeys = new Set([
+  'blockedEmailDomains',
+  'botLambdaSecurityGroupIds',
+  'botLambdaSubnetIds',
+  'disableChainedSearch',
+  'loginRateLimitExemptIps',
+]);
 
 export function isArrayConfig(key: string): boolean {
   return arrayKeys.has(key);

@@ -170,6 +170,22 @@ If using Medplum Bots, this is the name of the [Lambda layer](https://docs.aws.a
 
 **Default:** `medplum-bot-layer`
 
+### botLambdaSubnetIds
+
+Optional list of private subnet IDs for AWS Lambda Bots. Configure this together with `botLambdaSecurityGroupIds` to launch and update Bot functions inside a VPC.
+
+The environment variable `MEDPLUM_BOT_LAMBDA_SUBNET_IDS` accepts a comma-separated list.
+
+**Default:** None
+
+### botLambdaSecurityGroupIds
+
+Optional list of security group IDs for AWS Lambda Bots. Configure this together with `botLambdaSubnetIds`.
+
+The environment variable `MEDPLUM_BOT_LAMBDA_SECURITY_GROUP_IDS` accepts a comma-separated list.
+
+**Default:** None
+
 ### database
 
 The database connection details as a JSON object. Only available when using JSON config file.

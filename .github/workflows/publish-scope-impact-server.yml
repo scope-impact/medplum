@@ -1,0 +1,75 @@
+name: Publish Scope Impact Medplum server
+
+on:
+  push:
+    branches: [scope-impact/bot-lambda-vpc]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-scope-impact-medplum-server
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/scope-impact/medplum-server
+  RELEASE_TAG: 5.2.18-vpc.1
+
+jobs:
+  build-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install npm from packageManager
+        run: corepack enable npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start test dependencies
+        run: docker compose up -d postgres redis
+
+      - name: Wait for test dependencies
+        run: |
+          until docker compose exec -T postgres pg_isready --username medplum; do sleep 2; done
+          until docker compose exec -T redis valkey-cli --pass medplum ping; do sleep 2; done
+
+      - name: Seed test database
+        run: npm run test:seed --workspace=@medplum/server
+
+      - name: Test bot VPC configuration
+        run: npm test --workspace=@medplum/server -- src/config/utils.test.ts src/cloud/aws/deploy.test.ts
+
+      - name: Build server
+        run: npx turbo run build --filter=@medplum/server...
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build and publish
+        run: |
+          docker buildx build \
+            --file Dockerfile.scope-impact \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=true \
+            --sbom=true \
+            --tag "$IMAGE:$RELEASE_TAG" \
+            --tag "$IMAGE:$GITHUB_SHA" \
+            --push \
+            .

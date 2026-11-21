@@ -79,6 +79,8 @@ describe('Deploy', () => {
 
   beforeAll(async () => {
     const config = await loadTestConfig();
+    config.botLambdaSubnetIds = ['subnet-1', 'subnet-2'];
+    config.botLambdaSecurityGroupIds = ['sg-1'];
     await initApp(app, config);
     const result = await createTestProject({ withAccessToken: true, membership: { admin: true } });
     accessToken = result.accessToken;
@@ -94,10 +96,11 @@ describe('Deploy', () => {
 
     mockLambdaClient = mockClient(LambdaClient);
 
-    mockLambdaClient.on(CreateFunctionCommand).callsFake(({ FunctionName, Timeout }) => {
+    mockLambdaClient.on(CreateFunctionCommand).callsFake(({ FunctionName, Timeout, VpcConfig }) => {
       const lambdaConfig = {
         FunctionName,
         Timeout,
+        VpcConfig,
       };
       lambdaMap.set(FunctionName, lambdaConfig);
       return { Configuration: lambdaConfig };
@@ -126,6 +129,7 @@ describe('Deploy', () => {
               Arn: TEST_LAYER_ARN,
             },
           ],
+          VpcConfig: config.VpcConfig,
         };
       }
       throw new ResourceNotFoundException({ $metadata: {}, message: 'Function not found' });
@@ -139,10 +143,11 @@ describe('Deploy', () => {
       ],
     });
 
-    mockLambdaClient.on(UpdateFunctionConfigurationCommand).callsFake(({ FunctionName, Timeout }) => {
+    mockLambdaClient.on(UpdateFunctionConfigurationCommand).callsFake(({ FunctionName, Timeout, VpcConfig }) => {
       const lambdaConfig = {
         FunctionName,
         Timeout,
+        VpcConfig,
       };
 
       if (lambdaMap.has(FunctionName)) {
@@ -205,6 +210,10 @@ describe('Deploy', () => {
         FunctionName: name,
       })
     ).toHaveLength(1);
+    expect(mockLambdaClient.commandCalls(CreateFunctionCommand)[0].args[0].input.VpcConfig).toEqual({
+      SubnetIds: ['subnet-1', 'subnet-2'],
+      SecurityGroupIds: ['sg-1'],
+    });
 
     // Verify that this was uploaded as a CJS zip file
     const createCall = mockLambdaClient.commandCalls(CreateFunctionCommand)[0];
