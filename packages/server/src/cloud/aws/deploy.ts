@@ -28,6 +28,18 @@ export const LAMBDA_MEMORY = 1024;
 export const DEFAULT_LAMBDA_TIMEOUT = 10;
 export const MAX_LAMBDA_TIMEOUT = 900; // 60 * 15 (15 mins)
 
+function getBotLambdaVpcConfig(): { SubnetIds: string[]; SecurityGroupIds: string[] } | undefined {
+  const { botLambdaSubnetIds, botLambdaSecurityGroupIds } = getConfig();
+  if (!botLambdaSubnetIds?.length || !botLambdaSecurityGroupIds?.length) {
+    return undefined;
+  }
+  return { SubnetIds: botLambdaSubnetIds, SecurityGroupIds: botLambdaSecurityGroupIds };
+}
+
+function sameValues(actual: string[] | undefined, expected: string[]): boolean {
+  return actual?.length === expected.length && expected.every((value) => actual.includes(value));
+}
+
 /**
  * Removes runtime-provided AWS_* environment variables before user code loads.
  */
@@ -260,6 +272,7 @@ export async function deleteLambda(client: LambdaClient, name: string): Promise<
  */
 export async function createLambda(bot: Bot, client: LambdaClient, name: string, zipFile: Uint8Array): Promise<void> {
   const layerVersion = await getLayerVersion(client);
+  const vpcConfig = getBotLambdaVpcConfig();
 
   await client.send(
     new CreateFunctionCommand({
@@ -276,6 +289,7 @@ export async function createLambda(bot: Bot, client: LambdaClient, name: string,
       },
       Publish: true,
       Timeout: bot.timeout ?? DEFAULT_LAMBDA_TIMEOUT, // seconds
+      ...(vpcConfig && { VpcConfig: vpcConfig }),
     })
   );
 }
@@ -304,14 +318,20 @@ export async function updateLambda(bot: Bot, client: LambdaClient, name: string,
 async function updateLambdaConfig(bot: Bot, client: LambdaClient, name: string): Promise<void> {
   const layerVersion = await getLayerVersion(client);
   const functionConfig = await getLambdaConfig(client, name);
+  const vpcConfig = getBotLambdaVpcConfig();
 
   const timeout = bot.timeout ?? DEFAULT_LAMBDA_TIMEOUT;
+  const vpcConfigMatches =
+    !vpcConfig ||
+    (sameValues(functionConfig.VpcConfig?.SubnetIds, vpcConfig.SubnetIds) &&
+      sameValues(functionConfig.VpcConfig?.SecurityGroupIds, vpcConfig.SecurityGroupIds));
 
   if (
     functionConfig.Runtime === LAMBDA_RUNTIME &&
     functionConfig.Handler === LAMBDA_HANDLER &&
     functionConfig.Layers?.[0].Arn === layerVersion &&
-    functionConfig.Timeout === timeout
+    functionConfig.Timeout === timeout &&
+    vpcConfigMatches
   ) {
     // Everything is up-to-date
     return;
@@ -327,6 +347,7 @@ async function updateLambdaConfig(bot: Bot, client: LambdaClient, name: string):
       Handler: LAMBDA_HANDLER,
       Layers: [layerVersion],
       Timeout: timeout,
+      ...(vpcConfig && { VpcConfig: vpcConfig }),
     })
   );
 }

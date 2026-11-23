@@ -46,6 +46,25 @@ describe('utils', () => {
     expect(config.maxSearchOffset).toBe(5000);
   });
 
+  test('addDefaults accepts bot Lambda VPC settings together', () => {
+    const config = addDefaults({
+      baseUrl: 'https://example.com',
+      botLambdaSubnetIds: ['subnet-1'],
+      botLambdaSecurityGroupIds: ['sg-1'],
+    } as any);
+    expect(config.botLambdaSubnetIds).toEqual(['subnet-1']);
+    expect(config.botLambdaSecurityGroupIds).toEqual(['sg-1']);
+  });
+
+  test('addDefaults rejects partial bot Lambda VPC settings', () => {
+    expect(() =>
+      addDefaults({
+        baseUrl: 'https://example.com',
+        botLambdaSubnetIds: ['subnet-1'],
+      } as any)
+    ).toThrow('botLambdaSubnetIds and botLambdaSecurityGroupIds must be configured together');
+  });
+
   test('setValue parses integers', () => {
     const config = {};
     setValue(config, 'database.port', '12345');
@@ -93,6 +112,16 @@ describe('utils', () => {
     setValue(config, 'disableChainedSearch', 'Observation, AuditEvent');
     expect(config).toEqual({
       disableChainedSearch: ['Observation', 'AuditEvent'],
+    });
+  });
+
+  test('setValue stores bot Lambda VPC settings as comma-separated lists', () => {
+    const config = {};
+    setValue(config, 'botLambdaSubnetIds', 'subnet-1, subnet-2');
+    setValue(config, 'botLambdaSecurityGroupIds', 'sg-1');
+    expect(config).toEqual({
+      botLambdaSubnetIds: ['subnet-1', 'subnet-2'],
+      botLambdaSecurityGroupIds: ['sg-1'],
     });
   });
 

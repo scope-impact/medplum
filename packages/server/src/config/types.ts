@@ -71,6 +71,10 @@ export interface MedplumServerConfig {
   sseCustomerKey?: string;
   botLambdaRoleArn: string;
   botLambdaLayerName: string;
+  /** Private subnet IDs for AWS Lambda bots. Must be set with botLambdaSecurityGroupIds. */
+  botLambdaSubnetIds?: string[];
+  /** Security group IDs for AWS Lambda bots. Must be set with botLambdaSubnetIds. */
+  botLambdaSecurityGroupIds?: string[];
   /** Write each bot invocation's input to binary storage (e.g. S3) for debugging and analytics. Default is `true`. */
   storeBotInput?: boolean;
   logRequests?: boolean;

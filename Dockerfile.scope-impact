@@ -1,0 +1,9 @@
+# Halla Health Medplum server, based on the matching immutable upstream image.
+FROM medplum/medplum-server@sha256:5061141d2a0f30b3ae7486608d21d500f1b873d352fed1720004d5d6fa085954
+
+LABEL org.opencontainers.image.source="https://github.com/scope-impact/medplum"
+LABEL org.opencontainers.image.version="5.2.18-vpc.1"
+LABEL org.opencontainers.image.description="Medplum 5.2.18 with configurable VPC attachment for bot Lambdas"
+
+COPY --chown=1000:1000 packages/server/dist/index.js packages/server/dist/index.js.map \
+  /usr/src/medplum/packages/server/dist/
