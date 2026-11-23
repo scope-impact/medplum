@@ -1,0 +1,12 @@
+# Halla Health Medplum web app: the immutable upstream 5.2.17 image with its
+# Alpine packages patched. curl is unused by nginx or the entrypoint, so it is
+# removed; the remaining packages are upgraded to their fixed releases.
+FROM medplum/medplum-app@sha256:cf6285497179548b5c41e0410ab48642e59194c159332128c45bdd3bf003fcef
+
+LABEL org.opencontainers.image.source="https://github.com/scope-impact/medplum"
+LABEL org.opencontainers.image.version="5.2.17-patched.1"
+LABEL org.opencontainers.image.description="Medplum app 5.2.17 with patched Alpine packages"
+
+USER root
+RUN apk del --no-cache curl libcurl && apk upgrade --no-cache
+USER 101
