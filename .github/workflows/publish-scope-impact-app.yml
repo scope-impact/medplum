@@ -1,0 +1,75 @@
+name: Build Scope Impact Medplum app image
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - Dockerfile.scope-impact-app
+      - .github/workflows/publish-scope-impact-app.yml
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile.scope-impact-app
+      - .github/workflows/publish-scope-impact-app.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: scope-impact-medplum-app-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/scope-impact/medplum-app
+  RELEASE_TAG: 5.2.17-patched.1
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: Dockerfile.scope-impact-app
+          load: true
+          tags: scope-impact-medplum-app:scan
+
+      - name: Download Grype
+        id: grype
+        uses: anchore/scan-action/download-grype@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7
+
+      - name: Fail on Critical vulnerabilities
+        env:
+          GRYPE: ${{ steps.grype.outputs.cmd }}
+        run: '"$GRYPE" docker:scope-impact-medplum-app:scan --fail-on critical'
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: Dockerfile.scope-impact-app
+          platforms: linux/amd64,linux/arm64
+          provenance: true
+          sbom: true
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.RELEASE_TAG }}
+            ${{ env.IMAGE }}:${{ github.sha }}
